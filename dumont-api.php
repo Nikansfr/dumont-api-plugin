@@ -3,11 +3,44 @@
  * Plugin Name: Dumont API
  * Description: Custom REST API endpoint for Dumont DMS listing sync.
  * Version:     2.1.0
+ * GitHub Plugin URI: Nikansfr/dumont-api-plugin
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 define( 'DUMONT_API_KEY', 'DUMONT2026SECRET' );
+
+// Auto-updater via GitHub
+add_filter( 'pre_set_site_transient_update_plugins', function( $transient ) {
+    if ( empty( $transient->checked ) ) return $transient;
+
+    $plugin_slug = plugin_basename( __FILE__ );
+    $github_url  = 'https://api.github.com/repos/Nikansfr/dumont-api-plugin/releases/latest';
+
+    $response = wp_remote_get( $github_url, [
+        'headers' => [ 'User-Agent' => 'WordPress/' . get_bloginfo('version') ]
+    ]);
+
+    if ( is_wp_error( $response ) ) return $transient;
+
+    $release = json_decode( wp_remote_retrieve_body( $response ) );
+    if ( empty( $release->tag_name ) ) return $transient;
+
+    $latest_version = ltrim( $release->tag_name, 'v' );
+    $current_version = $transient->checked[ $plugin_slug ] ?? '0';
+
+    if ( version_compare( $latest_version, $current_version, '>' ) ) {
+        $transient->response[ $plugin_slug ] = (object)[
+            'slug'        => 'dumont-api-plugin',
+            'plugin'      => $plugin_slug,
+            'new_version' => $latest_version,
+            'url'         => 'https://github.com/Nikansfr/dumont-api-plugin',
+            'package'     => $release->zipball_url,
+        ];
+    }
+
+    return $transient;
+});
 
 // CORS headers
 add_action( 'rest_api_init', function () {
